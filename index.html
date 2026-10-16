@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <meta http-equiv="Cache-Control" content="no-store">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <title>Redirecting…</title>
 <style>
   :root{
@@ -178,7 +179,14 @@ const CONFIG = {
   }
   requestAnimationFrame(tick);
 
-  /* ---------- Redirect ---------- */
+  /* ---------- Redirect ----------
+     We navigate via a programmatic <a> click instead of location.replace().
+     Reason: location.replace() is treated by browsers as a script-driven
+     navigation and usually sends an EMPTY Referer header. Clicking a real
+     anchor is treated like a normal user navigation and preserves Referer
+     according to the document's referrer policy
+     (strict-origin-when-cross-origin by default, set explicitly in <head>).
+  */
   let redirected = false;
   function redirect() {
     if (redirected) return;
@@ -187,8 +195,22 @@ const CONFIG = {
     $btn.style.opacity = ".6";
     $status.innerHTML = "Redirecting…";
 
-    try { window.location.replace(CONFIG.targetUrl); }
-    catch (e) { window.location.href = CONFIG.targetUrl; }
+    const a = document.createElement('a');
+    a.href = CONFIG.targetUrl;
+    a.rel  = 'noopener';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+
+    try {
+      a.click();
+    } catch (e) {
+      // Last-resort fallback if programmatic click is blocked
+      try { window.location.href = CONFIG.targetUrl; }
+      catch (e2) { window.location.assign(CONFIG.targetUrl); }
+    }
+
+    // Clean up shortly after — navigation will have started by then
+    setTimeout(() => { try { a.remove(); } catch (e) {} }, 300);
   }
 
   $btn.addEventListener('click', function (e) {
